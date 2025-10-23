@@ -18,13 +18,13 @@ import RelationshipManager from "./RelationshipManager";
 import AssociationManager from "./AssociationManager";
 import DiagramActions from "./DiagramActions";
 import LoadingDiagram from "../../Loading/LoadingDiagram";
+import ImageDiagramUploader from "./ImageDiagramUploader";
+import XMLDiagramUploader from "./XMLDiagramUploader";
 
 import { Bars3Icon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/solid';
 
 import { generateAndExportXML } from './../../../utils/path-to-xml-export';
 import { generateAndDownloadZip, generateAndDownloadSpringBootProject } from "../../../utils/path-to-spring-boot";
-import { readXMLFile } from './../../../utils/path-to-utils'; // Cambia 'path-to-utils' por la ruta correcta
-import { importXML } from "./ImportFromXML";
 import ForeignKeyModal from "./ForeignKeyModal";
 import ForeignKeyAssociationModal from "./ForeignKeyAssociationModal";
 import { 
@@ -867,11 +867,91 @@ export default function WorkDiagram() {
     // Estado para controlar el reconocimiento de voz para generación
     const [listeningForGeneration, setListeningForGeneration] = useState(false);
 
+    // Estado para controlar el modal de importación desde imagen
+    const [showImageUploader, setShowImageUploader] = useState(false);
+
+    // Estado para controlar el modal de importación desde XML
+    const [showXMLUploader, setShowXMLUploader] = useState(false);
+
     // Generar diagrama base desde un dominio por voz
     const handleGenerateDiagramBase = () => {
         console.log("🎙️ Activando reconocimiento de voz para generar diagrama base...");
         setListeningForGeneration(true);
         // El micrófono se activará automáticamente cuando se abra el modal
+    };
+
+    // Abrir modal de importación desde imagen
+    const handleOpenImageUploader = () => {
+        console.log("🖼️ Abriendo importador de imagen...");
+        setShowImageUploader(true);
+    };
+
+    // Abrir modal de importación desde XML
+    const handleOpenXMLUploader = () => {
+        console.log("📄 Abriendo importador de XML...");
+        setShowXMLUploader(true);
+    };
+
+    // Procesar diagrama extraído de la imagen
+    const handleImageDiagramProcessed = (diagramData) => {
+        console.log("🖼️ Procesando datos de imagen:", diagramData);
+        
+        try {
+            // Limpiar diagrama actual
+            setClasses([]);
+            setRelationships([]);
+            setAssociations([]);
+
+            // Establecer nuevos datos
+            setClasses(diagramData.classes);
+            setRelationships(diagramData.relationships);
+            setAssociations(diagramData.associations);
+
+            // Actualizar el diagrama
+            handleUpdateDiagramContent(
+                diagramData.classes,
+                diagramData.relationships,
+                diagramData.associations
+            );
+
+            console.log("✅ Diagrama cargado desde imagen exitosamente!");
+            alert("¡Diagrama importado exitosamente desde la imagen!");
+
+        } catch (error) {
+            console.error("❌ Error al cargar diagrama desde imagen:", error);
+            alert("Error al cargar el diagrama desde la imagen.");
+        }
+    };
+
+    // Procesar diagrama extraído del XML
+    const handleXMLDiagramProcessed = (diagramData) => {
+        console.log("📄 Procesando datos de XML:", diagramData);
+        
+        try {
+            // Limpiar diagrama actual
+            setClasses([]);
+            setRelationships([]);
+            setAssociations([]);
+
+            // Establecer nuevos datos
+            setClasses(diagramData.classes);
+            setRelationships(diagramData.relationships);
+            setAssociations(diagramData.associations);
+
+            // Actualizar el diagrama
+            handleUpdateDiagramContent(
+                diagramData.classes,
+                diagramData.relationships,
+                diagramData.associations
+            );
+
+            console.log("✅ Diagrama cargado desde XML exitosamente!");
+            alert("¡Diagrama importado exitosamente desde XML!");
+
+        } catch (error) {
+            console.error("❌ Error al cargar diagrama desde XML:", error);
+            alert("Error al cargar el diagrama desde XML.");
+        }
     };
 
     // Función para procesar la generación de diagrama base
@@ -960,28 +1040,6 @@ export default function WorkDiagram() {
         }
     };
 
-    // Importar XML y generar clases, relaciones, asociaciones
-    const handleImportXML = async (file) => {
-        try {
-            const xmlString = await readXMLFile(file);
-
-            const { classes, relationships, associations } = importXML(xmlString);
-
-            console.log("Clases importadas:", classes);
-            console.log("Relaciones importadas:", relationships);
-
-            // Actualizar el estado o trabajar con las clases, relaciones y asociaciones importadas
-            setClasses(classes);
-            setRelationships(relationships);
-            setAssociations(associations);
-
-            console.log("Clases:", classes);
-            console.log("Relaciones:", relationships);
-            console.log("Asociaciones:", associations);
-        } catch (error) {
-            console.error("Error al importar el archivo XML:", error);
-        }
-    };
 
 
     return (
@@ -991,6 +1049,16 @@ export default function WorkDiagram() {
                 isActive={listeningForGeneration}
                 onDomainDetected={processDiagramGeneration}
                 onClose={() => setListeningForGeneration(false)}
+            />
+            <ImageDiagramUploader 
+                isActive={showImageUploader}
+                onClose={() => setShowImageUploader(false)}
+                onDiagramProcessed={handleImageDiagramProcessed}
+            />
+            <XMLDiagramUploader 
+                isActive={showXMLUploader}
+                onClose={() => setShowXMLUploader(false)}
+                onDiagramProcessed={handleXMLDiagramProcessed}
             />
             <div className={`${sidebarExpanded ? "w-64" : "w-16 h-screen"} bg-gray-800 text-gray-300 transition-all duration-300 relative`}>
                 <button
@@ -1017,6 +1085,12 @@ export default function WorkDiagram() {
                         <button className="w-full bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded-lg"
                             onClick={handleGenerateDiagramBase}>🤖 Generar Diagrama Base</button>
 
+                        <button className="w-full bg-purple-500 hover:bg-purple-600 text-white py-2 px-4 rounded-lg"
+                            onClick={handleOpenImageUploader}>🖼️ Importar desde Imagen</button>
+
+                        <button className="w-full bg-orange-500 hover:bg-orange-600 text-white py-2 px-4 rounded-lg"
+                            onClick={handleOpenXMLUploader}>📄 Importar desde XML</button>
+
                         <button className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg"
                             onClick={handleExportSpringBoot}>Exportar Spring Boot</button>
 
@@ -1042,13 +1116,6 @@ export default function WorkDiagram() {
                             onSubmit={handleForeignKeyAssociationSubmit}
                             associations={associations} // Enviar asociaciones
                         />
-
-                        <input
-                            type="file"
-                            accept=".xml"
-                            onChange={(e) => handleImportXML(e.target.files[0])}
-                        />
-
 
                         {/* Modal para ingresar el nombre del proyecto */}
                         <ProjectNameModal
