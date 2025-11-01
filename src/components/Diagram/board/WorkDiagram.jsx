@@ -25,6 +25,7 @@ import { Bars3Icon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/s
 
 import { generateAndExportXML } from './../../../utils/path-to-xml-export';
 import { generateAndDownloadZip, generateAndDownloadSpringBootProject } from "../../../utils/path-to-spring-boot";
+import { generateAndDownloadFlutterProject } from "../../../utils/path-to-flutter";
 import ForeignKeyModal from "./ForeignKeyModal";
 import ForeignKeyAssociationModal from "./ForeignKeyAssociationModal";
 import { 
@@ -406,6 +407,11 @@ export default function WorkDiagram() {
     // Modal Assocaition
     const [showForeignKeyAssociationModal, setShowForeignKeyAssociationModal] = useState(false);
     const [foreignKeyAssociation, setForeignKeyAssociation] = useState({});
+
+    // Modal Flutter Export
+    const [showFlutterModal, setShowFlutterModal] = useState(false);
+    const [flutterProjectName, setFlutterProjectName] = useState("");
+    const [flutterBackendUrl, setFlutterBackendUrl] = useState("http://localhost:8080");
 
 
     /* console.log("Relaciones:", relationships); */
@@ -864,6 +870,41 @@ export default function WorkDiagram() {
         setShowProjectNameModal(true); // Mostrar el modal para el nombre del proyecto
     };
 
+    // Handler para exportar a Flutter
+    const handleExportFlutter = () => {
+        setShowFlutterModal(true); // Mostrar el modal de configuración de Flutter
+    };
+
+    // Handler para confirmar exportación de Flutter
+    const handleFlutterExportSubmit = async () => {
+        if (!flutterProjectName.trim()) {
+            alert("Por favor ingrese un nombre de proyecto");
+            return;
+        }
+
+        if (classes.length === 0) {
+            alert("No hay clases para exportar");
+            return;
+        }
+
+        try {
+            await generateAndDownloadFlutterProject(
+                classes,
+                relationships,
+                associations,
+                flutterProjectName,
+                {},
+                "com.example.demo",
+                flutterBackendUrl
+            );
+            setShowFlutterModal(false);
+            alert("¡Proyecto Flutter generado exitosamente!");
+        } catch (error) {
+            console.error("Error al generar proyecto Flutter:", error);
+            alert("Error al generar el proyecto Flutter: " + error.message);
+        }
+    };
+
     // Estado para controlar el reconocimiento de voz para generación
     const [listeningForGeneration, setListeningForGeneration] = useState(false);
 
@@ -1094,6 +1135,9 @@ export default function WorkDiagram() {
                         <button className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg"
                             onClick={handleExportSpringBoot}>Exportar Spring Boot</button>
 
+                        <button className="w-full bg-cyan-500 hover:bg-cyan-600 text-white py-2 px-4 rounded-lg"
+                            onClick={handleExportFlutter}>📱 Exportar Flutter</button>
+
                         {/* Modal para ingresar el nombre del proyecto */}
                         <ProjectNameModal
                             show={showProjectNameModal}
@@ -1116,6 +1160,73 @@ export default function WorkDiagram() {
                             onSubmit={handleForeignKeyAssociationSubmit}
                             associations={associations} // Enviar asociaciones
                         />
+
+                        {/* Modal para exportar a Flutter */}
+                        {showFlutterModal && (
+                            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                                <div className="bg-white rounded-lg p-6 max-w-md w-full">
+                                    <h2 className="text-2xl font-bold mb-4 text-gray-800">Exportar a Flutter</h2>
+                                    
+                                    <div className="mb-4">
+                                        <label className="block text-sm font-medium mb-2 text-gray-700">
+                                            Nombre del Proyecto
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={flutterProjectName}
+                                            onChange={(e) => setFlutterProjectName(e.target.value)}
+                                            placeholder="mi_proyecto_flutter"
+                                            className="w-full border rounded px-3 py-2 text-gray-800"
+                                        />
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            Solo letras minúsculas, números y guiones bajos
+                                        </p>
+                                    </div>
+
+                                    <div className="mb-4">
+                                        <label className="block text-sm font-medium mb-2 text-gray-700">
+                                            URL del Backend Spring Boot
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={flutterBackendUrl}
+                                            onChange={(e) => setFlutterBackendUrl(e.target.value)}
+                                            placeholder="http://localhost:8080"
+                                            className="w-full border rounded px-3 py-2 text-gray-800"
+                                        />
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            URL donde está ejecutándose el backend
+                                        </p>
+                                    </div>
+
+                                    <div className="bg-blue-50 border border-blue-200 rounded p-3 mb-4">
+                                        <h3 className="font-semibold text-sm text-blue-900 mb-2">📋 Información</h3>
+                                        <ul className="text-xs text-blue-800 space-y-1">
+                                            <li>✅ Genera app Flutter completa</li>
+                                            <li>✅ Pantallas CRUD para cada entidad</li>
+                                            <li>✅ Conexión con API REST</li>
+                                            <li>✅ Gestión de estado con Provider</li>
+                                            <li>✅ Multi-plataforma (Android, iOS, Web)</li>
+                                        </ul>
+                                    </div>
+
+                                    <div className="flex justify-end gap-2">
+                                        <button
+                                            onClick={() => setShowFlutterModal(false)}
+                                            className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                                        >
+                                            Cancelar
+                                        </button>
+                                        <button
+                                            onClick={handleFlutterExportSubmit}
+                                            className="px-4 py-2 bg-cyan-500 text-white rounded hover:bg-cyan-600"
+                                        >
+                                            Generar Proyecto Flutter
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Modal para ingresar el nombre del proyecto */}
                         <ProjectNameModal
