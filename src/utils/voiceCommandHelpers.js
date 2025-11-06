@@ -37,6 +37,108 @@ export const normalizeTableName = (name) => {
 };
 
 /**
+ * Busca una clase por nombre con búsqueda inteligente
+ * Si no encuentra la clase exacta, intenta combinaciones de palabras adyacentes
+ * @param {Array} classes - Array de clases disponibles
+ * @param {string} searchName - Nombre a buscar (puede ser múltiples palabras)
+ * @returns {Object|null} - La clase encontrada o null
+ */
+export const findClassByName = (classes, searchName) => {
+  if (!searchName || !classes || classes.length === 0) return null;
+  
+  const normalized = normalizeTableName(searchName);
+  console.log(`🔍 Buscando clase: "${searchName}" (normalizado: "${normalized}")`);
+  
+  // 1. Intentar búsqueda exacta
+  let found = classes.find(cls => cls.name === normalized);
+  if (found) {
+    console.log(`✅ Clase encontrada (exacta): "${found.name}"`);
+    return found;
+  }
+  
+  // 2. Si no se encuentra, buscar combinaciones de palabras
+  // Separar el nombre en palabras individuales
+  const words = searchName.trim().split(/\s+/).map(w => w.trim()).filter(w => w);
+  
+  if (words.length > 1) {
+    console.log(`🔍 No se encontró exacto. Intentando combinaciones con palabras:`, words);
+    
+    // Generar combinaciones: todas juntas (2 palabras máximo)
+    if (words.length === 2) {
+      // Combinación: palabra1 + palabra2
+      const combo1 = normalizeTableName(words[0] + " " + words[1]);
+      found = classes.find(cls => cls.name === combo1);
+      if (found) {
+        console.log(`✅ Clase encontrada (combinación 1+2): "${found.name}"`);
+        return found;
+      }
+      
+      // Intento alternativo: buscar similitud
+      const similarity = findSimilarClass(classes, normalized);
+      if (similarity) {
+        console.log(`✅ Clase encontrada (similar): "${similarity.name}"`);
+        return similarity;
+      }
+    }
+  }
+  
+  // 3. Búsqueda por palabras que contengan (fallback)
+  const searchLower = normalized.toLowerCase();
+  found = classes.find(cls => cls.name.toLowerCase().includes(searchLower));
+  
+  // Buscar que contenga todas las palabras
+  if (!found && words.length > 1) {
+    found = classes.find(cls => {
+      const clsLower = cls.name.toLowerCase();
+      return words.every(word => clsLower.includes(word.toLowerCase()));
+    });
+  }
+  
+  if (found) {
+    console.log(`✅ Clase encontrada (parcial): "${found.name}"`);
+    return found;
+  }
+  
+  console.warn(`❌ No se encontró la clase "${searchName}" (normalizado: "${normalized}")`);
+  console.log(`📋 Clases disponibles: ${classes.map(c => c.name).join(', ')}`);
+  return null;
+};
+
+/**
+ * Busca una clase por similitud (similar a fuzzy search)
+ * Compara las clases disponibles y devuelve la más similar
+ */
+export const findSimilarClass = (classes, searchName) => {
+  if (!classes || classes.length === 0) return null;
+  
+  const searchLower = searchName.toLowerCase();
+  
+  // Calcular similitud para cada clase
+  let bestMatch = null;
+  let bestScore = 0;
+  
+  classes.forEach(cls => {
+    const clsLower = cls.name.toLowerCase();
+    
+    // Si contiene la búsqueda completa, puntuación alta
+    if (clsLower.includes(searchLower) || searchLower.includes(clsLower)) {
+      const score = Math.max(clsLower.length, searchLower.length) / Math.min(clsLower.length, searchLower.length);
+      if (score > bestScore) {
+        bestScore = score;
+        bestMatch = cls;
+      }
+    }
+  });
+  
+  // Solo devolver si la similitud es suficiente
+  if (bestScore > 0.6) {
+    return bestMatch;
+  }
+  
+  return null;
+};
+
+/**
  * Agrega una clase usando la misma lógica que ClassManager.addClass()
  * NOTA: El className ya debe estar normalizado antes de llamar esta función
  */
@@ -74,8 +176,8 @@ export const addClassViaVoice = (classes, setClasses, relationships, association
  * Agrega un atributo a una clase usando la misma lógica que ClassManager.addAttributeToClass()
  */
 export const addAttributeViaVoice = (classes, setClasses, relationships, associations, updateDiagram, tableName, attributeName) => {
-  // Normalizar nombre de tabla
-  const normalizedTableName = normalizeTableName(tableName);
+  // Búsqueda inteligente de la tabla
+  const table = findClassByName(classes, tableName);
   
   // Validar atributo
   if (!validateAttribute(attributeName)) {
@@ -83,19 +185,19 @@ export const addAttributeViaVoice = (classes, setClasses, relationships, associa
     return false;
   }
 
-  // Buscar la tabla (comparar nombres normalizados)
-  const tableIndex = classes.findIndex(cls => cls.name === normalizedTableName);
-  
-  if (tableIndex === -1) {
-    console.warn(`No se encontró la tabla '${normalizedTableName}'. Creando tabla automáticamente.`);
+  if (!table) {
+    console.warn(`No se encontró la tabla '${tableName}'. Creando tabla automáticamente.`);
     // Crear tabla automáticamente con el atributo
+    const normalizedTableName = normalizeTableName(tableName);
     return addClassViaVoice(classes, setClasses, relationships, associations, updateDiagram, normalizedTableName, [attributeName]);
   }
+  
+  const tableIndex = classes.findIndex(cls => cls.name === table.name);
 
   // Verificar si el atributo ya existe
   const existingClass = classes[tableIndex];
   if (existingClass.attributes.includes(attributeName)) {
-    console.warn(`El atributo '${attributeName}' ya existe en la tabla '${normalizedTableName}'`);
+    console.warn(`El atributo '${attributeName}' ya existe en la tabla '${table.name}'`);
     return false;
   }
 
@@ -122,7 +224,7 @@ export const addAttributeViaVoice = (classes, setClasses, relationships, associa
     associations: associations.length
   });
   
-  console.log(`Atributo '${attributeName}' agregado a la tabla '${normalizedTableName}'`);
+  console.log(`Atributo '${attributeName}' agregado a la tabla '${table.name}'`);
   return true;
 };
 
@@ -130,27 +232,27 @@ export const addAttributeViaVoice = (classes, setClasses, relationships, associa
  * Agrega una relación usando la misma lógica que RelationshipManager.addRelationship()
  */
 export const addRelationshipViaVoice = (classes, relationships, setRelationships, updateDiagram, fromTable, toTable, relationshipType, relationshipName = "", class1Multiplicity = "", class2Multiplicity = "") => {
-  // Normalizar nombres de tablas
-  const normalizedFromTable = normalizeTableName(fromTable);
-  const normalizedToTable = normalizeTableName(toTable);
+  // Búsqueda inteligente de clases con combinaciones
+  const fromClass = findClassByName(classes, fromTable);
+  const toClass = findClassByName(classes, toTable);
+  
+  if (!fromClass) {
+    console.warn(`❌ La tabla '${fromTable}' no existe o no se pudo encontrar. Clases disponibles: ${classes.map(c => c.name).join(', ')}`);
+    return false;
+  }
+  
+  if (!toClass) {
+    console.warn(`❌ La tabla '${toTable}' no existe o no se pudo encontrar. Clases disponibles: ${classes.map(c => c.name).join(', ')}`);
+    return false;
+  }
+  
+  // Usar los nombres encontrados (ya normalizados)
+  const normalizedFromTable = fromClass.name;
+  const normalizedToTable = toClass.name;
   
   // Mapear multiplicidades de voz a valores PlantUML
   const mappedClass1Multiplicity = mapMultiplicity(class1Multiplicity);
   const mappedClass2Multiplicity = mapMultiplicity(class2Multiplicity);
-  
-  // Validar que las tablas existan
-  const fromTableExists = classes.some(cls => cls.name === normalizedFromTable);
-  const toTableExists = classes.some(cls => cls.name === normalizedToTable);
-  
-  if (!fromTableExists) {
-    console.warn(`La tabla '${normalizedFromTable}' no existe`);
-    return false;
-  }
-  
-  if (!toTableExists) {
-    console.warn(`La tabla '${normalizedToTable}' no existe`);
-    return false;
-  }
 
   // Crear la relación con la misma estructura que RelationshipManager
   const newRelationship = {
@@ -245,14 +347,15 @@ export const addAssociationViaVoice = (classes, relationships, associations, set
  * Elimina una clase usando la misma lógica que ClassManager.deleteClass()
  */
 export const deleteClassViaVoice = (classes, setClasses, relationships, setRelationships, associations, setAssociations, updateDiagram, className) => {
-  // Normalizar el nombre de la clase para buscar
-  const normalizedClassName = normalizeTableName(className);
-  const classToDelete = classes.find(cls => cls.name === normalizedClassName);
+  // Búsqueda inteligente de la clase
+  const classToDelete = findClassByName(classes, className);
   
   if (!classToDelete) {
-    console.warn(`La clase '${normalizedClassName}' no existe. Clases disponibles: ${classes.map(c => c.name).join(', ')}`);
+    console.warn(`❌ La clase '${className}' no existe o no se pudo encontrar. Clases disponibles: ${classes.map(c => c.name).join(', ')}`);
     return false;
   }
+  
+  const normalizedClassName = classToDelete.name;
 
   // Eliminar relaciones donde la clase es from o to
   const updatedRelationships = relationships.filter(rel => rel.from !== normalizedClassName && rel.to !== normalizedClassName);
@@ -315,7 +418,6 @@ export const mapMultiplicity = (voiceMultiplicity) => {
     'uno a muchos': '1..*',
     '1 a muchos': '1..*',
     '1:*': '1..*',
-    'uno a muchos': '1..*',
     'uno a n': '1..*',
     '1 a n': '1..*',
     
@@ -327,7 +429,6 @@ export const mapMultiplicity = (voiceMultiplicity) => {
     'n a 1': '*',
     
     // Muchos a muchos
-    'muchos a muchos': '*..*',
     'muchos a muchos': '*..*',
     '*:*': '*..*',
     'n a n': '*..*',

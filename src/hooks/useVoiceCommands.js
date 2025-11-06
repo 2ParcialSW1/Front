@@ -19,7 +19,7 @@ export function useVoiceCommands({ onCommand = () => {}, onProcessingStart = () 
     const recognition = new SpeechRecognition();
     recognition.lang = "es";
     recognition.interimResults = true;
-    recognition.continuous = false; // Cambio a false para mejor control
+    recognition.continuous = true; // TRUE para que NO se corte automáticamente
     recognition.maxAlternatives = 1;
 
     recognition.onresult = async (event) => {

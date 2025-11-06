@@ -72,6 +72,23 @@ export default function AssociationManager({ classes, relationships, association
     }
   };
 
+  // Eliminar una asociación seleccionada
+  const deleteAssociation = () => {
+    if (selectedAssociation) {
+      setAssociations(prevAssociations => {
+        const updatedAssociations = prevAssociations.filter(assoc => assoc !== selectedAssociation);
+        updateDiagram(classes, relationships, updatedAssociations); // Actualizar el diagrama
+        return updatedAssociations;
+      });
+
+      // Limpiar campos después de eliminar
+      setSelectedAssociation(null);
+      setClass1("");
+      setClass2("");
+      setAssociationClass("");
+    }
+  };
+
   return (
     <div className="space-y-4">
       <h2 className="text-xl font-bold mb-4">Agregar Asociación (Clase Intermedia)</h2>
@@ -176,6 +193,13 @@ export default function AssociationManager({ classes, relationships, association
                 className="bg-green-500 text-white rounded-md p-2 hover:bg-green-600"
               >
                 Actualizar Asociación
+              </button>
+
+              <button
+                onClick={deleteAssociation}
+                className="bg-red-500 text-white rounded-md p-2 hover:bg-red-600"
+              >
+                Eliminar Asociación
               </button>
             </div>
           )}
