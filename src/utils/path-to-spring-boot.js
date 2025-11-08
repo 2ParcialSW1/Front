@@ -311,8 +311,14 @@ public class ${className}Controller {
     }
 
     @PostMapping
-    public ResponseEntity<${className}> createOrUpdate(@RequestBody ${className}DTO ${className.toLowerCase()}DTO) {
+    public ResponseEntity<${className}> create(@RequestBody ${className}DTO ${className.toLowerCase()}DTO) {
         ${className} ${className.toLowerCase()} = ${className.toLowerCase()}Service.save(${className.toLowerCase()}DTO);
+        return ResponseEntity.ok(${className.toLowerCase()});
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<${className}> update(@PathVariable Long id, @RequestBody ${className}DTO ${className.toLowerCase()}DTO) {
+        ${className} ${className.toLowerCase()} = ${className.toLowerCase()}Service.update(id, ${className.toLowerCase()}DTO);
         return ResponseEntity.ok(${className.toLowerCase()});
     }
 
@@ -360,6 +366,13 @@ public class ${className}Service {
 
     public ${className} save(${className}DTO ${className.toLowerCase()}DTO) {
         ${className} ${className.toLowerCase()} = new ${className}();
+        ${service.seters.join("\n        ")}
+        ${service.setRelationships.join("\n        ")}
+        return ${className.toLowerCase()}Repository.save(${className.toLowerCase()});
+    }
+
+    public ${className} update(Long id, ${className}DTO ${className.toLowerCase()}DTO) {
+        ${className} ${className.toLowerCase()} = ${className.toLowerCase()}Repository.findById(id).orElseThrow(() -> new EntityNotFoundException("No se encontró ${className.toLowerCase()} con el id " + id));
         ${service.seters.join("\n        ")}
         ${service.setRelationships.join("\n        ")}
         return ${className.toLowerCase()}Repository.save(${className.toLowerCase()});
@@ -1225,15 +1238,31 @@ public class ${className}Controller {
     }
 
     @PostMapping
-    @Operation(summary = "Crear o actualizar ${className}", description = "Crea un nuevo ${className} o actualiza uno existente")
+    @Operation(summary = "Crear ${className}", description = "Crea un nuevo ${className}")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "${className} creado/actualizado exitosamente"),
+        @ApiResponse(responseCode = "200", description = "${className} creado exitosamente"),
         @ApiResponse(responseCode = "400", description = "Datos inválidos")
     })
-    public ResponseEntity<${className}> createOrUpdate(
+    public ResponseEntity<${className}> create(
         @Parameter(description = "Datos del ${className}", required = true)
         @RequestBody ${className}DTO ${className.toLowerCase()}DTO) {
         ${className} ${className.toLowerCase()} = ${className.toLowerCase()}Service.save(${className.toLowerCase()}DTO);
+        return ResponseEntity.ok(${className.toLowerCase()});
+    }
+
+    @PutMapping("/{id}")
+    @Operation(summary = "Actualizar ${className}", description = "Actualiza un ${className} existente por su ID")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "${className} actualizado exitosamente"),
+        @ApiResponse(responseCode = "404", description = "${className} no encontrado"),
+        @ApiResponse(responseCode = "400", description = "Datos inválidos")
+    })
+    public ResponseEntity<${className}> update(
+        @Parameter(description = "ID del ${className} a actualizar", required = true)
+        @PathVariable Long id,
+        @Parameter(description = "Datos del ${className}", required = true)
+        @RequestBody ${className}DTO ${className.toLowerCase()}DTO) {
+        ${className} ${className.toLowerCase()} = ${className.toLowerCase()}Service.update(id, ${className.toLowerCase()}DTO);
         return ResponseEntity.ok(${className.toLowerCase()});
     }
 
@@ -1287,6 +1316,13 @@ public class ${className}Service {
 
     public ${className} save(${className}DTO ${className.toLowerCase()}DTO) {
         ${className} ${className.toLowerCase()} = new ${className}();
+        ${service.seters.join("\n        ")}
+        ${service.setRelationships.join("\n        ")}
+        return ${className.toLowerCase()}Repository.save(${className.toLowerCase()});
+    }
+
+    public ${className} update(Long id, ${className}DTO ${className.toLowerCase()}DTO) {
+        ${className} ${className.toLowerCase()} = ${className.toLowerCase()}Repository.findById(id).orElseThrow(() -> new EntityNotFoundException("No se encontró ${className.toLowerCase()} con el id " + id));
         ${service.seters.join("\n        ")}
         ${service.setRelationships.join("\n        ")}
         return ${className.toLowerCase()}Repository.save(${className.toLowerCase()});
