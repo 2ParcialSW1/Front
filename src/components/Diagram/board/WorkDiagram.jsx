@@ -24,7 +24,7 @@ import XMLDiagramUploader from "./XMLDiagramUploader";
 import { Bars3Icon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/solid';
 
 import { generateAndExportXML } from './../../../utils/path-to-xml-export';
-import { generateAndDownloadZip, generateAndDownloadSpringBootProject } from "../../../utils/path-to-spring-boot";
+import { generateAndDownloadSpringBootProject } from "../../../utils/path-to-spring-boot";
 import { generateAndDownloadFlutterProject } from "../../../utils/path-to-flutter";
 import ForeignKeyModal from "./ForeignKeyModal";
 import ForeignKeyAssociationModal from "./ForeignKeyAssociationModal";
@@ -801,7 +801,21 @@ export default function WorkDiagram() {
         
         console.log(`Relaciones limpias: ${cleanRelationships.length} de ${updatedRelationships.length}`);
 
-        updatedClasses.forEach(cls => {
+        // Primero, agregar todas las clases (incluyendo las intermedias de asociaciones)
+        const allClasses = [...updatedClasses];
+        
+        // Agregar clases intermedias de asociaciones si no están ya en las clases
+        updatedAssociations.forEach(assoc => {
+            if (assoc.associationClass) {
+                const normalizedAssociationClass = normalizeTableName(assoc.associationClass);
+                const exists = allClasses.some(c => normalizeTableName(c.name) === normalizedAssociationClass);
+                if (!exists) {
+                    allClasses.push({ name: normalizedAssociationClass, attributes: [] });
+                }
+            }
+        });
+        
+        allClasses.forEach(cls => {
             const normalizedName = normalizeTableName(cls.name);
             plantUML += `class ${normalizedName} {\n`;
             cls.attributes.forEach(attr => plantUML += `  ${attr}\n`);
@@ -874,31 +888,23 @@ export default function WorkDiagram() {
         });
 
 
+        // Procesar asociaciones: agregar relaciones desde las clases hacia la clase intermedia
         updatedAssociations.forEach(assoc => {
             if (assoc.class1 && assoc.class2 && assoc.associationClass) {
-                if (!plantUML.includes(`class ${assoc.associationClass}`)) {
-                    /* plantUML += `class ${assoc.associationClass} {\n`;
-                    plantUML += `}\n`; */
-                // Buscar en el plantUML la seccion de class y agregar la clase de asociacion
-                const normalizedAssociationClass = normalizeTableName(assoc.associationClass);
-                const classAssociation = `class ${normalizedAssociationClass} {\n}\n`;
-                plantUML = plantUML.replace("@startuml", `@startuml\n${classAssociation}`);
-                }
-
-                /* plantUML += `${assoc.class1} "0..*" - "1..*" ${assoc.class2}\n`;
-                plantUML += `(${assoc.class1}, ${assoc.class2}) .. ${assoc.associationClass}\n`; */
-                // Buscar en el plantUML la seccion de relaciones y agregar la relacion al final
                 const normalizedClass1 = normalizeTableName(assoc.class1);
                 const normalizedClass2 = normalizeTableName(assoc.class2);
-                const relationship = `${normalizedClass1} "0..*" - "1..*" ${normalizedClass2}\n(${normalizedClass1}, ${normalizedClass2}) .. ${normalizedAssociationClass}\n`;
-                plantUML += relationship;
-                /* plantUML += `class ${assoc.associationClass} {\n`;
-                plantUML += `}\n`;
-                plantUML += `${assoc.class1} "0..*" - "1..*" ${assoc.class2}\n`;
-                plantUML += `(${assoc.class1}, ${assoc.class2}) .. ${assoc.associationClass}\n`; */
+                const normalizedAssociationClass = normalizeTableName(assoc.associationClass);
+                
+                console.log(`🔗 Generando PlantUML para asociación: ${normalizedClass1} <-> ${normalizedClass2} (intermedia: ${normalizedAssociationClass})`);
+                
+                // Formato PlantUML para asociaciones con clase intermedia:
+                // Evitar la sintaxis con paréntesis (que puede dibujar líneas curvas inesperadas)
+                // En su lugar, conectar la clase de asociación con líneas punteadas a cada clase.
+                plantUML += `${normalizedClass1} "0..*" -- "1..*" ${normalizedClass2}\n`;
+                // Conectar la clase intermedia con ambas clases (líneas punteadas) en vez de usar (A, B) .. Assoc
+                plantUML += `${normalizedAssociationClass} .. ${normalizedClass1}\n`;
+                plantUML += `${normalizedAssociationClass} .. ${normalizedClass2}\n`;
             }
-
-            /* console.log("PlantUML:", plantUML); */
         });
 
         plantUML += "\n@enduml";
@@ -1023,19 +1029,194 @@ export default function WorkDiagram() {
             setRelationships([]);
             setAssociations([]);
 
-            // Establecer nuevos datos
-            setClasses(diagramData.classes);
-            setRelationships(diagramData.relationships);
-            setAssociations(diagramData.associations);
+            // Variables temporales para construir el diagrama
+            let tempClasses = [];
+            let tempRelationships = [];
+            let tempAssociations = [];
 
-            // Actualizar el diagrama
-            handleUpdateDiagramContent(
-                diagramData.classes,
-                diagramData.relationships,
-                diagramData.associations
-            );
+            // 1. PRIMERO: Agregar todas las clases (usando la misma lógica que addClassViaVoice)
+            console.log("📦 Agregando clases...");
+            diagramData.classes.forEach(cls => {
+                const normalizedName = normalizeTableName(cls.name);
+                const normalizedAttributes = (cls.attributes || []).filter(attr => {
+                    // Filtrar atributos inválidos (como "id")
+                    const idPattern = /\b(id)\b/i;
+                    return !idPattern.test(attr);
+                });
+                
+                // Validar nombre de clase (misma lógica que addClassViaVoice)
+                const classNamePattern = /^[A-Z][A-Za-z]*$/;
+                if (!classNamePattern.test(normalizedName)) {
+                    console.warn(`⚠️ Nombre de clase inválido: ${normalizedName}`);
+                    return;
+                }
+                
+                // Verificar si la clase ya existe
+                if (tempClasses.some(c => c.name === normalizedName)) {
+                    console.warn(`⚠️ La clase ${normalizedName} ya existe`);
+                    return;
+                }
+                
+                // Agregar la clase
+                tempClasses.push({ name: normalizedName, attributes: normalizedAttributes });
+                console.log(`✅ Clase agregada: ${normalizedName}`);
+            });
+
+            // 2. SEGUNDO: Procesar relaciones directamente (SIN conversión automática a asociaciones)
+            console.log("🔗 Procesando relaciones de imagen...");
+            console.log("📋 Relaciones recibidas:", diagramData.relationships);
+            
+            // Para importación de imagen: NO convertir automáticamente a asociaciones
+            // Solo usar las asociaciones explícitas que vienen en diagramData.associations
+            const relacionesNormales = diagramData.relationships;
+
+            // 3. TERCERO: Agregar asociaciones que ya vienen del procesamiento de la IA
+            console.log("🔗 Agregando asociaciones explícitas de la IA...");
+            (diagramData.associations || []).forEach(assoc => {
+                const class1 = normalizeTableName(assoc.class1);
+                const class2 = normalizeTableName(assoc.class2);
+                const associationClass = normalizeTableName(assoc.associationClass);
+                
+                // Verificar que todas las clases existan
+                const class1Exists = tempClasses.some(c => c.name === class1);
+                const class2Exists = tempClasses.some(c => c.name === class2);
+                
+                if (class1Exists && class2Exists) {
+                    // Crear la clase intermedia si no existe (misma lógica que addClassViaVoice)
+                    if (!tempClasses.some(c => c.name === associationClass)) {
+                        const classNamePattern = /^[A-Z][A-Za-z]*$/;
+                        if (classNamePattern.test(associationClass)) {
+                            tempClasses.push({ name: associationClass, attributes: [] });
+                            console.log(`✅ Clase intermedia creada: ${associationClass}`);
+                        }
+                    }
+                    
+                    // Agregar la asociación (misma lógica que addAssociationViaVoice)
+                    const normalizedClass1 = class1;
+                    const normalizedClass2 = class2;
+                    const normalizedAssociationClass = associationClass;
+                    
+                    // Verificar si la asociación ya existe
+                    const existingAssociation = tempAssociations.find(
+                        assoc =>
+                            assoc.class1 === normalizedClass1 &&
+                            assoc.class2 === normalizedClass2 &&
+                            assoc.associationClass === normalizedAssociationClass
+                    );
+                    
+                    if (!existingAssociation) {
+                        tempAssociations.push({
+                            class1: normalizedClass1,
+                            class2: normalizedClass2,
+                            associationClass: normalizedAssociationClass
+                        });
+                        console.log(`✅ Asociación agregada: ${associationClass} entre ${class1} y ${class2}`);
+                    }
+                } else {
+                    console.warn(`⚠️ No se pudo agregar asociación: ${class1} o ${class2} no existe`);
+                }
+            });
+
+            // 5. QUINTO: Filtrar relaciones que ya están cubiertas por asociaciones
+            // Si una relación está entre dos clases que tienen una asociación, NO agregarla como relación normal
+            console.log("🔗 Filtrando relaciones que están cubiertas por asociaciones...");
+            const relacionesFiltradas = relacionesNormales.filter(rel => {
+                const fromClass = normalizeTableName(rel.from);
+                const toClass = normalizeTableName(rel.to);
+                
+                // Verificar si estas dos clases tienen una asociación
+                const tieneAsociacion = tempAssociations.some(assoc => {
+                    const assocClass1 = normalizeTableName(assoc.class1);
+                    const assocClass2 = normalizeTableName(assoc.class2);
+                    return (assocClass1 === fromClass && assocClass2 === toClass) ||
+                           (assocClass1 === toClass && assocClass2 === fromClass);
+                });
+                
+                if (tieneAsociacion) {
+                    console.log(`🗑️ Relación ${fromClass} -> ${toClass} filtrada (ya está en una asociación)`);
+                    return false;
+                }
+                return true;
+            });
+            
+            console.log(`📊 Relaciones después de filtrar: ${relacionesFiltradas.length} de ${relacionesNormales.length}`);
+
+            // 6. SEXTO: Agregar relaciones normales (corrigiendo dirección de generalizaciones)
+            console.log("🔗 Agregando relaciones normales...");
+            relacionesFiltradas.forEach(rel => {
+                let fromClass = normalizeTableName(rel.from);
+                let toClass = normalizeTableName(rel.to);
+                // ⚠️ NO volver a mapear: rel.type ya viene mapeado desde ImageDiagramUploader
+                let relationshipType = rel.type;
+                
+                // CORREGIR DIRECCIÓN DE GENERALIZACIONES
+                // En generalizaciones, "from" debe ser la subclase y "to" la superclase
+                // Si el tipo es herencia (<|-- o --|>), verificar la dirección
+                if (relationshipType === "<|--" || relationshipType === "--|>") {
+                    // En PlantUML, <|-- significa que la subclase apunta a la superclase
+                    // Si la IA invirtió la dirección, corregirla
+                    // Por ahora, asumimos que la IA puede haberla invertido
+                    // Si el tipo es <|--, entonces from=subclase, to=superclase (correcto)
+                    // Si el tipo es --|>, entonces está invertido, intercambiar
+                    if (relationshipType === "--|>") {
+                        // Intercambiar from y to para corregir la dirección
+                        [fromClass, toClass] = [toClass, fromClass];
+                        relationshipType = "<|--"; // Corregir el tipo también
+                        console.log(`🔄 Corregida dirección de generalización: ${toClass} <|-- ${fromClass}`);
+                    }
+                }
+                
+                // Verificar que ambas clases existan
+                const fromExists = tempClasses.some(c => c.name === fromClass);
+                const toExists = tempClasses.some(c => c.name === toClass);
+                
+                if (fromExists && toExists) {
+                    // Agregar relación (misma lógica que addRelationshipViaVoice)
+                    // ⚠️ NO volver a mapear multiplicidades: ya vienen mapeadas desde ImageDiagramUploader
+                    const mappedClass1Multiplicity = rel.class1Multiplicity || "";
+                    const mappedClass2Multiplicity = rel.class2Multiplicity || "";
+                    
+                    // Crear la relación
+                    const newRelationship = {
+                        from: fromClass,
+                        to: toClass,
+                        type: relationshipType,
+                        name: rel.name || "",
+                        class1Multiplicity: !["--|>", "<|--", "..|>"].includes(relationshipType) ? mappedClass1Multiplicity : "",
+                        class2Multiplicity: !["--|>", "<|--", "..|>"].includes(relationshipType) ? mappedClass2Multiplicity : "",
+                    };
+                    
+                    // Verificar si la relación ya existe
+                    const existingRelationship = tempRelationships.find(
+                        r =>
+                            r.from === fromClass &&
+                            r.to === toClass &&
+                            r.type === relationshipType &&
+                            r.class1Multiplicity === mappedClass1Multiplicity &&
+                            r.class2Multiplicity === mappedClass2Multiplicity
+                    );
+                    
+                    if (!existingRelationship) {
+                        tempRelationships.push(newRelationship);
+                        console.log(`✅ Relación agregada: ${fromClass} ${relationshipType} ${toClass}`);
+                    } else {
+                        console.warn(`⚠️ La relación ya existe: ${fromClass} ${relationshipType} ${toClass}`);
+                    }
+                } else {
+                    console.warn(`⚠️ No se pudo agregar relación: ${fromClass} o ${toClass} no existe`);
+                }
+            });
+
+            // 7. SÉPTIMO: Actualizar el estado final
+            setClasses(tempClasses);
+            setRelationships(tempRelationships);
+            setAssociations(tempAssociations);
+
+            // Actualizar el diagrama final
+            handleUpdateDiagramContent(tempClasses, tempRelationships, tempAssociations);
 
             console.log("✅ Diagrama cargado desde imagen exitosamente!");
+            console.log(`📊 Resumen: ${tempClasses.length} clases, ${tempRelationships.length} relaciones, ${tempAssociations.length} asociaciones`);
             alert("¡Diagrama importado exitosamente desde la imagen!");
 
         } catch (error) {

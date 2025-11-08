@@ -25,9 +25,11 @@ export const normalizeTableName = (name) => {
   
   // Remover acentos y caracteres especiales
   const withoutAccents = trimmed.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  
+  // Eliminar cualquier carácter que no sea letra, número o espacio (quita símbolos raros detectados por OCR)
+  const cleaned = withoutAccents.replace(/[^A-Za-z0-9\s]/g, "");
+
   // Remover espacios y capitalizar cada palabra (PascalCase)
-  const words = withoutAccents.split(/\s+/);
+  const words = cleaned.split(/\s+/);
   const normalized = words.map(word => 
     word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
   ).join('');
@@ -395,11 +397,38 @@ export const mapRelationshipType = (voiceType) => {
     'realizacion': '..|>',
     'nest': '--+'
   };
-  
-  const mappedType = typeMap[normalizedType] || voiceType;
+  // Si la entrada ya parece un símbolo de PlantUML, aceptar el símbolo tal cual
+  // Lista de símbolos permitidos (comunes en PlantUML)
+  const allowedSymbols = new Set(['--', '-->', '<--', '<|--', '--|>', '*--', '--*', 'o--', '--o', '..>', '..|>', '--+', '->', '<-', '->>', '<<-']);
+
+  const trimmed = voiceType ? voiceType.toString().trim() : '';
+
+  // Si la entrada contiene principalmente caracteres simbólicos, comprobar si es un símbolo válido
+  const onlySymbols = /^[-.|o*+<>]+$/i.test(trimmed);
+  if (onlySymbols && allowedSymbols.has(trimmed)) {
+    console.log(`Mapeando tipo (símbolo directo): "${voiceType}" → "${trimmed}"`);
+    return trimmed;
+  }
+
+  // Si la entrada ya es exactamente uno de los símbolos permitidos (posible que venga del procesamiento previo), devolverlo
+  if (allowedSymbols.has(trimmed)) {
+    console.log(`Mapeando tipo (símbolo directo exacto): "${voiceType}" → "${trimmed}"`);
+    return trimmed;
+  }
+
+  // Si no es símbolo, mapear por palabra
+  const mappedType = typeMap[normalizedType] || '--';
+
+  // Si el tipo original contiene símbolos no alfanuméricos (posible output OCR) y no se encontró en el mapa, logear
+  const isSymbolic = /[^a-z0-9\s]/i.test(voiceType);
+  if (!typeMap[normalizedType] && isSymbolic) {
+    console.warn(`Tipo de relación no reconocido o simbólico: "${voiceType}" — usando fallback '--'`);
+  }
+
   console.log(`Mapeando tipo: "${voiceType}" → "${normalizedType}" → "${mappedType}"`);
   return mappedType;
 };
+
 
 /**
  * Mapea multiplicidades de voz a valores PlantUML
