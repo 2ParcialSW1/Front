@@ -62,8 +62,6 @@ REGLAS DE ANÁLISIS:
 3. TIPOS DE RELACIONES (IMPORTANTE: SOLO devuelve relaciones que están EXPLÍCITAMENTE visibles en el diagrama):
    - NO inventes relaciones que no existan
    - "herencia" → triángulo o flecha cerrada apuntando a clase padre (solo si está clara)
-     * DIRECCIÓN CRÍTICA: En generalizaciones, "desde" debe ser la SUBCLASE (clase hija) y "hacia" debe ser la SUPERCLASE (clase padre)
-     * Ejemplo: Si "ClaseCuatro" hereda de "ClaseTres", entonces: desde="ClaseCuatro", hacia="ClaseTres"
    - "composicion" → rombo relleno/negro en un extremo (solo si está claro)
    - "agregacion" → rombo vacío/blanco en un extremo (solo si está claro)
    - "asociacion" → línea simple entre clases (si hay líneas entre clases)
@@ -78,16 +76,9 @@ REGLAS DE ANÁLISIS:
    - "0..*" → cero o muchos
    - Si no es legible, dejar vacío ""
 
-5. ASOCIACIONES CON CLASE INTERMEDIA (CLASE DE ASOCIACIÓN):
-   - Si ves una línea punteada (o línea discontinua) que conecta el punto medio de una asociación a una clase separada,
-     esa clase ES la "clase de asociación" (association class) para esa relación.
-   - Ejemplo: Si hay una línea entre "ClaseUno" y "ClaseDos", y una línea PUNTEADA conecta esa asociación a "Claseunoclasedos",
-     entonces crear entrada en "asociaciones": clase1="ClaseUno", clase2="ClaseDos", claseIntermedia="Claseunoclasedos"
-   - IMPORTANTE: Si ves una clase de asociación explícita (con línea punteada), NO crear relaciones individuales entre las clases originales
-   - Si NO hay clase de asociación visible pero hay una relación muchos a muchos (multiplicidad "*" o "0..*" o "1..*" en ambos extremos),
-     crear entrada en "asociaciones" con clase intermedia (combinar nombres: Clase1Clase2)
-   - NO confundir: Una clase de asociación es diferente de una clase que simplemente conecta dos clases.
-     Solo es clase de asociación si hay una línea PUNTEADA conectando el punto medio de la asociación a la clase.
+5. ASOCIACIONES CON CLASE INTERMEDIA:
+   - Si detectas una clase que conecta dos clases con relaciones especiales
+   - Crear entrada en "asociaciones" con clase1, clase2, claseIntermedia
 
 6. NORMALIZACIÓN:
    - Nombres en PascalCase: "usuario pedido" → "UsuarioPedido"
