@@ -62,10 +62,10 @@ function ListDiagrams() {
                                         <tr key={diagram._id}>
                                             <td className="px-6 py-4 whitespace-nowrap">{diagram.name}</td>
                                             <td className="px-6 py-4 whitespace-nowrap">
-                                                {diagram.anfitrion.firstName} {diagram.anfitrion.lastName}
+                                                {diagram.anfitrion.firstName} 
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
-                                                {diagram.participantes.map((participante) => `${participante.firstName} ${participante.lastName}`).join(", ")}
+                                                {diagram.participantes.map((participante) => `${participante.firstName}`).join(", ")}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap flex items-center space-x-2">
                                                 <a href={`/private/diagrams/${diagram._id}`} className="text-indigo-600 hover:text-indigo-900 flex items-center space-x-1">
