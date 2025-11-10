@@ -20,11 +20,22 @@ export async function processCommandWithAI(commandText) {
             {
               role: "system",
               content:
-                "Eres un parser de comandos de voz para un editor de diagramas UML. Devuelve únicamente un objeto JSON válido, sin texto adicional ni bloques de código.\n\nREGLAS CRÍTICAS:\n1. ATRIBUTOS: 'agregar atributo X a Y' o 'agregar atributo X a tabla Y' → SIEMPRE usar acción 'agregar_atributo'\n2. RELACIONES: Si dice 'relación' (aunque sea 'relación asociación') → usar acción 'agregar_relacion'\n3. ASOCIACIONES: Si dice 'asociación entre A y B con clase intermedia C' → usar acción 'agregar_asociacion'\n4. ASOCIACIONES: Si dice 'asociación entre A y B' SIN 'clase intermedia' → usar acción 'agregar_relacion'\n5. NUNCA confundir 'agregar atributo' con 'limpiar_relaciones' - son completamente diferentes\n6. NUNCA usar 'agregar_asociacion' si no hay una clase intermedia específica mencionada\n\nLos comandos disponibles son: agregar_tabla, agregar_atributo, eliminar_atributo, agregar_relacion, agregar_asociacion, eliminar_asociacion, eliminar_tabla, seleccionar, exportar_diagrama, restaurar_diagrama, limpiar_relaciones, generar_diagrama.",
+                `Eres un parser de comandos de voz para un editor de diagramas UML.
+                 Devuelve únicamente un objeto JSON válido, sin texto adicional ni bloques de código.
+                 \n\nREGLAS CRÍTICAS:\n1. ATRIBUTOS: 'agregar atributo X a Y' o '
+                 'agregar atributo X a tabla Y' → SIEMPRE usar acción 'agregar_atributo'\n2. 
+                 RELACIONES SIMPLES: Si dice 'relación X' donde X es (generalizacion, especializacion, composicion, agregacion, dependencia, etc) → usar acción 'agregar_relacion'
+                 \n3. ASOCIACIONES CON MULTIPLICIDAD:\n   - 'asociación entre A y B' SIN multiplicidad → agregar parámetro 'falta_multiplicidad: true'\n   - 'asociación entre A y B de uno a muchos/muchos a uno/uno a uno/ y todas las otras conbinaciones' → acción 'agregar_relacion' con multiplicidades\n   - 'asociación entre A y B de muchos a muchos' → acción 'agregar_asociacion' con 'clase_intermedia_nombres' combinar A+B\n   - 'asociación entre A y B con clase intermedia C' → acción 'agregar_asociacion' con 'clase_intermedia_nombre: C'\n4. NUNCA confundir 'agregar atributo' con 'limpiar_relaciones'\n5. NUNCA inferir multiplicidad si no está especificada
+                 \n6. ELIMINAR RELACIÓN: 'eliminar relación entre A y B' → acción 'eliminar_relacion' con desde/hacia
+                 \n7. LIMPIAR RELACIONES: 'limpiar relaciones' (sin especificar tablas) → acción 'limpiar_relaciones'
+                 \n8. NUNCA confundir 'eliminar relación entre X y Y' con 'limpiar relaciones'
+                 \n\nLos comandos disponibles son: agregar_tabla, agregar_atributo, eliminar_atributo, 
+                 agregar_relacion, eliminar_relacion, agregar_asociacion, eliminar_asociacion, eliminar_tabla, seleccionar, 
+                 exportar_diagrama, restaurar_diagrama, limpiar_relaciones, generar_diagrama.`,
             },
             {
               role: "user",
-              content: `Interpreta el siguiente comando de voz: "${commandText}" y devuélvelo como un JSON con la estructura: {"acción": "tipo_comando", "parámetros": {"tabla": "nombre", "atributo": "nombre", "desde": "tabla_origen", "hacia": "tabla_destino", "tipo": "tipo_relacion", "nombre": "nombre_relacion", "multiplicidad1": "valor", "multiplicidad2": "valor", "clase_asociacion": "nombre"}}. 
+              content: `Interpreta el siguiente comando de voz: "${commandText}" y devuélvelo como un JSON con la estructura: {"acción": "tipo_comando", "parámetros": {"tabla": "nombre", "atributo": "nombre", "desde": "tabla_origen", "hacia": "tabla_destino", "tipo": "tipo_relacion", "nombre": "nombre_relacion", "multiplicidad1": "valor", "multiplicidad2": "valor", "clase_asociacion": "nombre", "falta_multiplicidad": boolean, "clase_intermedia_nombres": boolean, "clase_intermedia_nombre": "nombre"}}. 
 
 Multiplicidades comunes: "1", "0..1", "1..*", "0..*", "*", "1..1", "0..1", "1..n", "m..n"
 
@@ -37,12 +48,19 @@ IMPORTANTE para multiplicidades en relaciones:
 Ejemplos de comandos:
 
 RELACIONES SIMPLES (acción: agregar_relacion):
-- "Agregar relación asociacion entre Usuario y Producto con multiplicidad uno a muchos" 
+- "Agregar relación generalizacion entre Usuario y Cliente"
+- "Agregar relación composicion entre Orden y Item"
+- "Agregar relación herencia entre Animal y Perro"
+
+ASOCIACIONES CON MULTIPLICIDAD (acción: agregar_relacion o agregar_asociacion según caso):
+- "Agregar asociación entre Usuario y Producto" 
+  → {"acción": "agregar_relacion", "parámetros": {"desde": "Usuario", "hacia": "Producto", "tipo": "asociacion", "falta_multiplicidad": true}}
+- "Agregar asociación entre Usuario y Producto de uno a muchos"
   → {"acción": "agregar_relacion", "parámetros": {"desde": "Usuario", "hacia": "Producto", "tipo": "asociacion", "multiplicidad1": "1", "multiplicidad2": "*"}}
-- "Crear relación asociacion entre usuario y productos de muchos a uno"
-  → {"acción": "agregar_relacion", "parámetros": {"desde": "usuario", "hacia": "productos", "tipo": "asociacion", "multiplicidad1": "*", "multiplicidad2": "1"}}
-- "Agregar relación composicion entre Orden y Item de uno a muchos"
-- "Agregar relación herencia entre Usuario y Cliente"
+- "Agregar asociación entre Usuario y Producto de muchos a muchos"
+  → {"acción": "agregar_asociacion", "parámetros": {"desde": "Usuario", "hacia": "Producto", "clase_intermedia_nombres": true}}
+- "Agregar asociación entre Usuario y Producto con clase intermedia Participacion"
+  → {"acción": "agregar_asociacion", "parámetros": {"desde": "Usuario", "hacia": "Producto", "clase_intermedia_nombre": "Participacion"}}
 
 GESTIÓN DE ATRIBUTOS:
 - "Agregar atributo nombre a Usuario" (acción: agregar_atributo, parámetros: {"tabla": "Usuario", "atributo": "nombre"})
@@ -50,11 +68,19 @@ GESTIÓN DE ATRIBUTOS:
 - "Eliminar atributo precio de Producto" (acción: eliminar_atributo, parámetros: {"tabla": "Producto", "atributo": "precio"})
 - "Quitar atributo email de Usuario" (acción: eliminar_atributo, parámetros: {"tabla": "Usuario", "atributo": "email"})
 
-ASOCIACIONES CON CLASE INTERMEDIA:
-- "Agregar asociación entre Usuario y Proyecto con clase intermedia Participacion" (acción: agregar_asociacion)
-- "Crear asociación entre Cliente y Producto con clase intermedia Compra" (acción: agregar_asociacion)
-- "Eliminar asociación con clase intermedia Participacion" (acción: eliminar_asociacion)
-- "Eliminar asociación entre Usuario y Proyecto" (acción: eliminar_asociacion)
+ELIMINAR RELACIONES:
+- "Eliminar relación entre Usuario y Producto" (acción: eliminar_relacion, parámetros: {"desde": "Usuario", "hacia": "Producto"})
+- "Quitar relación entre tabla melodía y modo género" (acción: eliminar_relacion, parámetros: {"desde": "melodía", "hacia": "modo género"})
+
+ELIMINAR ASOCIACIONES:
+- "Eliminar asociación entre Usuario y MétodoDePago" (acción: eliminar_asociacion, parámetros: {"desde": "Usuario", "hacia": "MétodoDePago"})
+- "Quitar asociación entre usuarios y método de pago" (acción: eliminar_asociacion, parámetros: {"desde": "usuarios", "hacia": "método de pago"})
+- ⚠️ IMPORTANTE: Si el usuario dice "asociación" → usar SIEMPRE acción "eliminar_asociacion"
+
+DIFERENCIA IMPORTANTE:
+- "Limpiar relaciones" SIN especificar tablas → acción: limpiar_relaciones (elimina TODAS las relaciones)
+- "Eliminar relación entre A y B" → acción: eliminar_relacion (elimina UNA relación específica)
+- "Eliminar asociación entre A y B" → acción: eliminar_asociacion (elimina UNA asociación + su clase intermedia)
 
 UTILIDADES:
 - "Limpiar relaciones" (acción: limpiar_relaciones)

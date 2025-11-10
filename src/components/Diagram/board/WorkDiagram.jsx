@@ -25,6 +25,7 @@ import { Bars3Icon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/s
 
 import { generateAndExportXML } from './../../../utils/path-to-xml-export';
 import { generateAndDownloadZip, generateAndDownloadSpringBootProject } from "../../../utils/path-to-spring-boot";
+import { generateAndDownloadFlutterProject } from "../../../utils/path-to-flutter";
 import ForeignKeyModal from "./ForeignKeyModal";
 import ForeignKeyAssociationModal from "./ForeignKeyAssociationModal";
 import { 
@@ -98,6 +99,9 @@ export default function WorkDiagram() {
         class1Multiplicity: cmd.parámetros?.multiplicidad1 || cmd.class1Multiplicity,
         class2Multiplicity: cmd.parámetros?.multiplicidad2 || cmd.class2Multiplicity,
         associationClass: cmd.parámetros?.clase_asociacion || cmd.associationClass,
+        faltaMultiplicidad: cmd.parámetros?.falta_multiplicidad,
+        claseIntermediaNombre: cmd.parámetros?.clase_intermedia_nombre,
+        claseIntermediaNombres: cmd.parámetros?.clase_intermedia_nombres,
       };
 
       // ----------------- Agregar tabla -----------------
@@ -234,11 +238,15 @@ export default function WorkDiagram() {
         console.log("  - class1Multiplicity:", normalizedCmd.class1Multiplicity);
         console.log("  - class2Multiplicity:", normalizedCmd.class2Multiplicity);
         
-        if (!normalizedCmd.fromTable || !normalizedCmd.toTable || !normalizedCmd.relationshipType) {
-          console.warn("❌ Faltan parámetros para crear la relación (desde, hacia, tipo)");
-          console.warn("  - ¿Falta fromTable?", !normalizedCmd.fromTable);
-          console.warn("  - ¿Falta toTable?", !normalizedCmd.toTable);
-          console.warn("  - ¿Falta relationshipType?", !normalizedCmd.relationshipType);
+        if (!normalizedCmd.fromTable || !normalizedCmd.toTable) {
+          console.warn("❌ Faltan parámetros para crear la relación (desde, hacia)");
+          return;
+        }
+
+        // REGLA: Si es tipo "asociacion" sin multiplicidad especificada
+        if (normalizedCmd.relationshipType === "asociacion" && normalizedCmd.faltaMultiplicidad) {
+          console.warn("❌ Falta la multiplicidad para la asociación");
+          alert("Para crear una asociación, debes especificar la multiplicidad. Por ejemplo: 'de uno a muchos'");
           return;
         }
         
@@ -261,9 +269,27 @@ export default function WorkDiagram() {
 
       // ----------------- Agregar asociación -----------------
       if (normalizedCmd.action === "agregar_asociacion" || normalizedCmd.action === "addAssociation") {
-        if (!normalizedCmd.fromTable || !normalizedCmd.toTable || !normalizedCmd.associationClass) {
-          console.warn("Faltan parámetros para crear la asociación (clase1, clase2, clase_asociacion)");
-          console.warn("Si quieres una relación simple, usa: 'Agregar relación asociacion entre A y B'");
+        if (!normalizedCmd.fromTable || !normalizedCmd.toTable) {
+          console.warn("Faltan parámetros para crear la asociación (clase1, clase2)");
+          return;
+        }
+
+        // Determinar el nombre de la clase intermedia
+        let nombreClaseIntermedia;
+        
+        if (normalizedCmd.claseIntermediaNombre) {
+          // Usuario especificó el nombre de la clase intermedia
+          nombreClaseIntermedia = normalizedCmd.claseIntermediaNombre;
+        } else if (normalizedCmd.claseIntermediaNombres) {
+          // Usuario dijo "muchos a muchos" → combinar nombres de las tablas
+          const fromTable = normalizeTableName(normalizedCmd.fromTable);
+          const toTable = normalizeTableName(normalizedCmd.toTable);
+          nombreClaseIntermedia = `${fromTable}${toTable}`;
+        } else if (normalizedCmd.associationClass) {
+          // Fallback a parámetro antiguo
+          nombreClaseIntermedia = normalizedCmd.associationClass;
+        } else {
+          console.warn("Faltan parámetros para crear la asociación (clase_intermedia_nombre o clase_intermedia_nombres)");
           return;
         }
         
@@ -275,7 +301,7 @@ export default function WorkDiagram() {
           handleUpdateDiagramContent,
           normalizedCmd.fromTable,
           normalizedCmd.toTable,
-          normalizedCmd.associationClass
+          nombreClaseIntermedia
         );
         return;
       }
@@ -288,9 +314,13 @@ export default function WorkDiagram() {
         }
         
         let updatedAssociations;
+        let associationToDelete = null;
         
         if (normalizedCmd.associationClass) {
           // Eliminar por nombre de clase intermedia
+          associationToDelete = associations.find(assoc => 
+            normalizeTableName(assoc.associationClass) === normalizeTableName(normalizedCmd.associationClass)
+          );
           updatedAssociations = associations.filter(assoc => 
             normalizeTableName(assoc.associationClass) !== normalizeTableName(normalizedCmd.associationClass)
           );
@@ -299,6 +329,22 @@ export default function WorkDiagram() {
           // Eliminar por clases involucradas
           const normalizedFrom = normalizeTableName(normalizedCmd.fromTable);
           const normalizedTo = normalizeTableName(normalizedCmd.toTable);
+          
+          console.log("🔍 DEBUG Eliminar Asociación:");
+          console.log("  - Buscando entre:", normalizedFrom, "y", normalizedTo);
+          console.log("  - Asociaciones existentes:", associations);
+          
+          // Normalizar las clases de las asociaciones existentes para comparar
+          associationToDelete = associations.find(assoc => {
+            const normClass1 = normalizeTableName(assoc.class1);
+            const normClass2 = normalizeTableName(assoc.class2);
+            console.log(`  - Comparando: ${normClass1} - ${normClass2} con ${normalizedFrom} - ${normalizedTo}`);
+            return (normClass1 === normalizedFrom && normClass2 === normalizedTo) ||
+                   (normClass1 === normalizedTo && normClass2 === normalizedFrom);
+          });
+          
+          console.log("  - Asociación encontrada:", associationToDelete);
+          
           updatedAssociations = associations.filter(assoc => 
             !(normalizeTableName(assoc.class1) === normalizedFrom && normalizeTableName(assoc.class2) === normalizedTo) &&
             !(normalizeTableName(assoc.class1) === normalizedTo && normalizeTableName(assoc.class2) === normalizedFrom)
@@ -306,10 +352,13 @@ export default function WorkDiagram() {
           console.log(`Eliminando asociación entre: ${normalizedFrom} y ${normalizedTo}`);
         }
         
-        if (updatedAssociations.length < associations.length) {
+        if (updatedAssociations.length < associations.length && associationToDelete) {
+          // Eliminar también la clase intermedia de las clases
+          const updatedClasses = classes.filter(cls => cls.name !== associationToDelete.associationClass);
+          setClasses(updatedClasses);
           setAssociations(updatedAssociations);
-          handleUpdateDiagramContent(classes, relationships, updatedAssociations);
-          console.log("Asociación eliminada exitosamente");
+          handleUpdateDiagramContent(updatedClasses, relationships, updatedAssociations);
+          console.log(`Asociación y clase intermedia '${associationToDelete.associationClass}' eliminadas exitosamente`);
         } else {
           console.warn("No se encontró la asociación a eliminar");
         }
@@ -333,6 +382,31 @@ export default function WorkDiagram() {
           handleUpdateDiagramContent,
           normalizedCmd.tableName
         );
+        return;
+      }
+
+      // ----------------- Eliminar relación específica -----------------
+      if (normalizedCmd.action === "eliminar_relacion" || normalizedCmd.action === "deleteRelationship") {
+        if (!normalizedCmd.fromTable || !normalizedCmd.toTable) {
+          console.warn("No se especificó las tablas para eliminar la relación");
+          return;
+        }
+        
+        const normalizedFrom = normalizeTableName(normalizedCmd.fromTable);
+        const normalizedTo = normalizeTableName(normalizedCmd.toTable);
+        
+        const updatedRelationships = relationships.filter(rel => 
+          !(normalizeTableName(rel.from) === normalizedFrom && normalizeTableName(rel.to) === normalizedTo) &&
+          !(normalizeTableName(rel.from) === normalizedTo && normalizeTableName(rel.to) === normalizedFrom)
+        );
+        
+        if (updatedRelationships.length < relationships.length) {
+          setRelationships(updatedRelationships);
+          handleUpdateDiagramContent(classes, updatedRelationships, associations);
+          console.log(`Relación entre ${normalizedFrom} y ${normalizedTo} eliminada exitosamente`);
+        } else {
+          console.warn("No se encontró la relación a eliminar");
+        }
         return;
       }
 
@@ -406,6 +480,11 @@ export default function WorkDiagram() {
     // Modal Assocaition
     const [showForeignKeyAssociationModal, setShowForeignKeyAssociationModal] = useState(false);
     const [foreignKeyAssociation, setForeignKeyAssociation] = useState({});
+
+    // Modal Flutter Export
+    const [showFlutterModal, setShowFlutterModal] = useState(false);
+    const [flutterProjectName, setFlutterProjectName] = useState("");
+    const [flutterBackendUrl, setFlutterBackendUrl] = useState("http://localhost:8080");
 
 
     /* console.log("Relaciones:", relationships); */
@@ -517,7 +596,7 @@ export default function WorkDiagram() {
         // Extraer clases primero
         while ((match = classRegex.exec(diagram)) !== null) {
             const attributes = match[2].trim().split("\n").map(attr => attr.trim()).filter(attr => attr);
-            foundClasses.push({ name: match[1], attributes });
+            foundClasses.push({ name: normalizeTableName(match[1]), attributes });
         }
 
         // Mostrar clases encontradas
@@ -562,9 +641,9 @@ export default function WorkDiagram() {
         while ((match = tableAssociationRegex.exec(cleanedDiagram)) !== null) {
             /* console.log("Asociación intermedia encontrada:", match); */
             const newAssociation = {
-                class1: match[1],
-                class2: match[2],
-                associationClass: match[3],
+                class1: normalizeTableName(match[1]),
+                class2: normalizeTableName(match[2]),
+                associationClass: normalizeTableName(match[3]),
             };
 
             if (!foundTableAssociations.some(assoc =>
@@ -723,7 +802,8 @@ export default function WorkDiagram() {
         console.log(`Relaciones limpias: ${cleanRelationships.length} de ${updatedRelationships.length}`);
 
         updatedClasses.forEach(cls => {
-            plantUML += `class ${cls.name} {\n`;
+            const normalizedName = normalizeTableName(cls.name);
+            plantUML += `class ${normalizedName} {\n`;
             cls.attributes.forEach(attr => plantUML += `  ${attr}\n`);
             plantUML += "}\n";
         });
@@ -766,7 +846,10 @@ export default function WorkDiagram() {
             let relationship = "";
             
             // Formato: Clase1 "multiplicidad1" relación "multiplicidad2" Clase2
-            relationship += from;
+            const normalizedFrom = normalizeTableName(from);
+            const normalizedTo = normalizeTableName(to);
+            
+            relationship += normalizedFrom;
             
             if (class1Multiplicity) {
                 relationship += ` "${class1Multiplicity}"`;
@@ -778,7 +861,7 @@ export default function WorkDiagram() {
                 relationship += ` "${class2Multiplicity}"`;
             }
             
-            relationship += ` ${to}`;
+            relationship += ` ${normalizedTo}`;
             
             // Para debugging: mostrar formato alternativo también
             const alternativeFormat = `${from} ||${class1Multiplicity || ''}${plantUMLType}${class2Multiplicity || ''}|| ${to}`;
@@ -796,15 +879,18 @@ export default function WorkDiagram() {
                 if (!plantUML.includes(`class ${assoc.associationClass}`)) {
                     /* plantUML += `class ${assoc.associationClass} {\n`;
                     plantUML += `}\n`; */
-                    // Buscar en el plantUML la seccion de class y agregar la clase de asociacion
-                    const classAssociation = `class ${assoc.associationClass} {\n}\n`;
-                    plantUML = plantUML.replace("@startuml", `@startuml\n${classAssociation}`);
+                // Buscar en el plantUML la seccion de class y agregar la clase de asociacion
+                const normalizedAssociationClass = normalizeTableName(assoc.associationClass);
+                const classAssociation = `class ${normalizedAssociationClass} {\n}\n`;
+                plantUML = plantUML.replace("@startuml", `@startuml\n${classAssociation}`);
                 }
 
                 /* plantUML += `${assoc.class1} "0..*" - "1..*" ${assoc.class2}\n`;
                 plantUML += `(${assoc.class1}, ${assoc.class2}) .. ${assoc.associationClass}\n`; */
                 // Buscar en el plantUML la seccion de relaciones y agregar la relacion al final
-                const relationship = `${assoc.class1} "0..*" - "1..*" ${assoc.class2}\n(${assoc.class1}, ${assoc.class2}) .. ${assoc.associationClass}\n`;
+                const normalizedClass1 = normalizeTableName(assoc.class1);
+                const normalizedClass2 = normalizeTableName(assoc.class2);
+                const relationship = `${normalizedClass1} "0..*" - "1..*" ${normalizedClass2}\n(${normalizedClass1}, ${normalizedClass2}) .. ${normalizedAssociationClass}\n`;
                 plantUML += relationship;
                 /* plantUML += `class ${assoc.associationClass} {\n`;
                 plantUML += `}\n`;
@@ -862,6 +948,41 @@ export default function WorkDiagram() {
 
     const handleExportSpringBoot = () => {
         setShowProjectNameModal(true); // Mostrar el modal para el nombre del proyecto
+    };
+
+    // Handler para exportar a Flutter
+    const handleExportFlutter = () => {
+        setShowFlutterModal(true); // Mostrar el modal de configuración de Flutter
+    };
+
+    // Handler para confirmar exportación de Flutter
+    const handleFlutterExportSubmit = async () => {
+        if (!flutterProjectName.trim()) {
+            alert("Por favor ingrese un nombre de proyecto");
+            return;
+        }
+
+        if (classes.length === 0) {
+            alert("No hay clases para exportar");
+            return;
+        }
+
+        try {
+            await generateAndDownloadFlutterProject(
+                classes,
+                relationships,
+                associations,
+                flutterProjectName,
+                {},
+                "com.example.demo",
+                flutterBackendUrl
+            );
+            setShowFlutterModal(false);
+            alert("¡Proyecto Flutter generado exitosamente!");
+        } catch (error) {
+            console.error("Error al generar proyecto Flutter:", error);
+            alert("Error al generar el proyecto Flutter: " + error.message);
+        }
     };
 
     // Estado para controlar el reconocimiento de voz para generación
@@ -933,16 +1054,43 @@ export default function WorkDiagram() {
             setRelationships([]);
             setAssociations([]);
 
-            // Establecer nuevos datos
-            setClasses(diagramData.classes);
-            setRelationships(diagramData.relationships);
-            setAssociations(diagramData.associations);
+            // Establecer nuevos datos NORMALIZADOS
+            const normalizedClasses = diagramData.classes.map(cls => ({
+                ...cls,
+                name: normalizeTableName(cls.name)
+            }));
+            const normalizedRelationships = diagramData.relationships.map(rel => ({
+                ...rel,
+                from: normalizeTableName(rel.from),
+                to: normalizeTableName(rel.to)
+            }));
+            const normalizedAssociations = diagramData.associations?.map(assoc => ({
+                ...assoc,
+                class1: normalizeTableName(assoc.class1),
+                class2: normalizeTableName(assoc.class2),
+                associationClass: normalizeTableName(assoc.associationClass)
+            })) || [];
 
-            // Actualizar el diagrama
+            // ELIMINAR DUPLICADOS después de normalizar
+            const uniqueClasses = normalizedClasses.filter((cls, index, self) => {
+                const firstIndex = self.findIndex(c => c.name === cls.name);
+                return firstIndex === index;
+            });
+            
+            // Log para debugging
+            if (normalizedClasses.length !== uniqueClasses.length) {
+                console.warn(`⚠️ Clases duplicadas eliminadas: ${normalizedClasses.length - uniqueClasses.length}`);
+            }
+
+            setClasses(uniqueClasses);
+            setRelationships(normalizedRelationships);
+            setAssociations(normalizedAssociations);
+
+            // Actualizar el diagrama con datos normalizados (usar uniqueClasses)
             handleUpdateDiagramContent(
-                diagramData.classes,
-                diagramData.relationships,
-                diagramData.associations
+                uniqueClasses,
+                normalizedRelationships,
+                normalizedAssociations
             );
 
             console.log("✅ Diagrama cargado desde XML exitosamente!");
@@ -1094,6 +1242,9 @@ export default function WorkDiagram() {
                         <button className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg"
                             onClick={handleExportSpringBoot}>Exportar Spring Boot</button>
 
+                        <button className="w-full bg-cyan-500 hover:bg-cyan-600 text-white py-2 px-4 rounded-lg"
+                            onClick={handleExportFlutter}>📱 Exportar Flutter</button>
+
                         {/* Modal para ingresar el nombre del proyecto */}
                         <ProjectNameModal
                             show={showProjectNameModal}
@@ -1116,6 +1267,73 @@ export default function WorkDiagram() {
                             onSubmit={handleForeignKeyAssociationSubmit}
                             associations={associations} // Enviar asociaciones
                         />
+
+                        {/* Modal para exportar a Flutter */}
+                        {showFlutterModal && (
+                            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                                <div className="bg-white rounded-lg p-6 max-w-md w-full">
+                                    <h2 className="text-2xl font-bold mb-4 text-gray-800">Exportar a Flutter</h2>
+                                    
+                                    <div className="mb-4">
+                                        <label className="block text-sm font-medium mb-2 text-gray-700">
+                                            Nombre del Proyecto
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={flutterProjectName}
+                                            onChange={(e) => setFlutterProjectName(e.target.value)}
+                                            placeholder="mi_proyecto_flutter"
+                                            className="w-full border rounded px-3 py-2 text-gray-800"
+                                        />
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            Solo letras minúsculas, números y guiones bajos
+                                        </p>
+                                    </div>
+
+                                    <div className="mb-4">
+                                        <label className="block text-sm font-medium mb-2 text-gray-700">
+                                            URL del Backend Spring Boot
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={flutterBackendUrl}
+                                            onChange={(e) => setFlutterBackendUrl(e.target.value)}
+                                            placeholder="http://localhost:8080"
+                                            className="w-full border rounded px-3 py-2 text-gray-800"
+                                        />
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            URL donde está ejecutándose el backend
+                                        </p>
+                                    </div>
+
+                                    <div className="bg-blue-50 border border-blue-200 rounded p-3 mb-4">
+                                        <h3 className="font-semibold text-sm text-blue-900 mb-2">📋 Información</h3>
+                                        <ul className="text-xs text-blue-800 space-y-1">
+                                            <li>✅ Genera app Flutter completa</li>
+                                            <li>✅ Pantallas CRUD para cada entidad</li>
+                                            <li>✅ Conexión con API REST</li>
+                                            <li>✅ Gestión de estado con Provider</li>
+                                            <li>✅ Multi-plataforma (Android, iOS, Web)</li>
+                                        </ul>
+                                    </div>
+
+                                    <div className="flex justify-end gap-2">
+                                        <button
+                                            onClick={() => setShowFlutterModal(false)}
+                                            className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                                        >
+                                            Cancelar
+                                        </button>
+                                        <button
+                                            onClick={handleFlutterExportSubmit}
+                                            className="px-4 py-2 bg-cyan-500 text-white rounded hover:bg-cyan-600"
+                                        >
+                                            Generar Proyecto Flutter
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Modal para ingresar el nombre del proyecto */}
                         <ProjectNameModal

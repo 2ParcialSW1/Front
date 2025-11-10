@@ -59,14 +59,14 @@ REGLAS DE ANÁLISIS:
    - Atributos: SOLO nombres, sin visibilidad (+,-,#), sin tipos de datos
    - Métodos: OPCIONAL, lista simple de nombres
 
-3. TIPOS DE RELACIONES (devuelve el nombre descriptivo):
-   - "herencia" → triángulo o flecha cerrada apuntando a clase padre
-   - "composicion" → rombo relleno/negro en un extremo
-   - "agregacion" → rombo vacío/blanco en un extremo
-   - "asociacion" → línea simple entre clases
-   - "asociacion_directa" → línea con flecha abierta (→)
-   - "dependencia" → línea punteada con flecha
-   - "realizacion" → línea punteada con triángulo
+3. TIPOS DE RELACIONES (IMPORTANTE: SOLO devuelve relaciones que están EXPLÍCITAMENTE visibles en el diagrama):
+   - NO inventes relaciones que no existan
+   - "herencia" → triángulo o flecha cerrada apuntando a clase padre (solo si está clara)
+   - "composicion" → rombo relleno/negro en un extremo (solo si está claro)
+   - "agregacion" → rombo vacío/blanco en un extremo (solo si está claro)
+   - "asociacion" → línea simple entre clases (si hay líneas entre clases)
+   - "asociacion_directa" → línea con flecha abierta (→) (solo si hay flecha visible)
+   - Si no puedes identificar claramente el tipo, usa "asociacion" por defecto
 
 4. MULTIPLICIDADES (formato estándar):
    - "1" → uno
@@ -120,7 +120,9 @@ FORMATO DE RESPUESTA JSON:
 Si la imagen está borrosa o no es clara:
 - Prioriza: nombres de clases > atributos > relaciones > multiplicidades
 - Indica "confianza": "baja" o "media"
-- En el mensaje explica qué no se pudo detectar claramente`
+- En el mensaje explica qué no se pudo detectar claramente
+
+CRÍTICO: NO agregues relaciones de "dependencia", "realizacion" u otros tipos complejos si no están EXPLÍCITAMENTE visibles en el diagrama. Si hay dudas, omite la relación completamente o usa "asociacion" genérica. Es preferible tener menos relaciones que inventar relaciones que no existen.`
           },
           {
             role: "user",
