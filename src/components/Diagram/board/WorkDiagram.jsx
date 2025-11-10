@@ -21,7 +21,7 @@ import LoadingDiagram from "../../Loading/LoadingDiagram";
 import ImageDiagramUploader from "./ImageDiagramUploader";
 import XMLDiagramUploader from "./XMLDiagramUploader";
 
-import { Bars3Icon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/solid';
+import { Bars3Icon, ChevronDownIcon, ChevronUpIcon, QuestionMarkCircleIcon } from '@heroicons/react/24/solid';
 
 import { generateAndExportXML } from './../../../utils/path-to-xml-export';
 import { generateAndDownloadZip, generateAndDownloadSpringBootProject } from "../../../utils/path-to-spring-boot";
@@ -38,6 +38,7 @@ import {
   normalizeTableName
 } from '../../../utils/voiceCommandHelpers';
 import { generateDiagramForDomain } from '../../../services/commandProcessor';
+import { downloadVoiceCommandsPDF } from '../../../utils/pdfHelpers';
 
 const { SOCKET_URL } = Config;
 
@@ -1403,7 +1404,20 @@ export default function WorkDiagram() {
                 )}
             </div>
 
-            <div className={`${sidebarExpanded ? "w-3/4" : "w-[calc(100%-64px)]"} flex flex-col justify-center items-center bg-gray-100 p-6 transition-all duration-300`}>
+            <div className={`${sidebarExpanded ? "w-3/4" : "w-[calc(100%-64px)]"} flex flex-col justify-center items-center bg-gray-100 p-6 transition-all duration-300 relative`}>
+                
+                {/* Botón de ayuda flotante */}
+                <button 
+                    onClick={downloadVoiceCommandsPDF}
+                    className="absolute top-4 right-4 bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-full shadow-lg z-10 transition-all duration-200 hover:scale-110 group"
+                    title="Descargar guía de comandos por voz"
+                >
+                    <QuestionMarkCircleIcon className="w-6 h-6" />
+                    <span className="absolute -bottom-12 right-0 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
+                        Guía de comandos por voz
+                    </span>
+                </button>
+
                 {diagramContent !== "" ? (
                     <DiagramViewer diagramContent={diagramContent} />
                 ) : (
