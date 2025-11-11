@@ -487,6 +487,10 @@ export default function WorkDiagram() {
     const [flutterProjectName, setFlutterProjectName] = useState("");
     const [flutterBackendUrl, setFlutterBackendUrl] = useState("http://localhost:8080");
 
+    // Estados para menús desplegables del sidebar
+    const [showExportMenu, setShowExportMenu] = useState(false);
+    const [showImportMenu, setShowImportMenu] = useState(false);
+
 
     /* console.log("Relaciones:", relationships); */
     useEffect(() => {
@@ -1228,23 +1232,83 @@ export default function WorkDiagram() {
                             onRestore={restoreOriginalDiagram}
                         />
 
-                        <button className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg"
-                            onClick={handleExportXML}>Exportar XML</button>
+                        {/* Menú desplegable Exportar */}
+                        <div className="relative">
+                            <button
+                                onClick={() => setShowExportMenu(!showExportMenu)}
+                                className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg flex justify-between items-center"
+                            >
+                                <span>📤 Exportar</span>
+                                {showExportMenu ? <ChevronUpIcon className="w-5 h-5" /> : <ChevronDownIcon className="w-5 h-5" />}
+                            </button>
+                            {showExportMenu && (
+                                <div className="mt-2 space-y-2 pl-4">
+                                    <button 
+                                        onClick={() => {
+                                            handleExportXML();
+                                            setShowExportMenu(false);
+                                        }}
+                                        className="w-full bg-blue-400 hover:bg-blue-500 text-white py-2 px-4 rounded-lg text-left"
+                                    >
+                                        📄 XML
+                                    </button>
+                                    <button 
+                                        onClick={() => {
+                                            handleExportSpringBoot();
+                                            setShowExportMenu(false);
+                                        }}
+                                        className="w-full bg-green-400 hover:bg-green-500 text-white py-2 px-4 rounded-lg text-left"
+                                    >
+                                        ☕ Spring Boot
+                                    </button>
+                                    <button 
+                                        onClick={() => {
+                                            handleExportFlutter();
+                                            setShowExportMenu(false);
+                                        }}
+                                        className="w-full bg-cyan-400 hover:bg-cyan-500 text-white py-2 px-4 rounded-lg text-left"
+                                    >
+                                        📱 Flutter
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Menú desplegable Importar */}
+                        <div className="relative">
+                            <button
+                                onClick={() => setShowImportMenu(!showImportMenu)}
+                                className="w-full bg-purple-500 hover:bg-purple-600 text-white py-2 px-4 rounded-lg flex justify-between items-center"
+                            >
+                                <span>📥 Importar</span>
+                                {showImportMenu ? <ChevronUpIcon className="w-5 h-5" /> : <ChevronDownIcon className="w-5 h-5" />}
+                            </button>
+                            {showImportMenu && (
+                                <div className="mt-2 space-y-2 pl-4">
+                                    <button 
+                                        onClick={() => {
+                                            handleOpenImageUploader();
+                                            setShowImportMenu(false);
+                                        }}
+                                        className="w-full bg-purple-400 hover:bg-purple-500 text-white py-2 px-4 rounded-lg text-left"
+                                    >
+                                        🖼️ Desde Imagen
+                                    </button>
+                                    <button 
+                                        onClick={() => {
+                                            handleOpenXMLUploader();
+                                            setShowImportMenu(false);
+                                        }}
+                                        className="w-full bg-orange-400 hover:bg-orange-500 text-white py-2 px-4 rounded-lg text-left"
+                                    >
+                                        📄 Desde XML
+                                    </button>
+                                </div>
+                            )}
+                        </div>
 
                         <button className="w-full bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded-lg"
                             onClick={handleGenerateDiagramBase}>🤖 Generar Diagrama Base</button>
-
-                        <button className="w-full bg-purple-500 hover:bg-purple-600 text-white py-2 px-4 rounded-lg"
-                            onClick={handleOpenImageUploader}>🖼️ Importar desde Imagen</button>
-
-                        <button className="w-full bg-orange-500 hover:bg-orange-600 text-white py-2 px-4 rounded-lg"
-                            onClick={handleOpenXMLUploader}>📄 Importar desde XML</button>
-
-                        <button className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg"
-                            onClick={handleExportSpringBoot}>Exportar Spring Boot</button>
-
-                        <button className="w-full bg-cyan-500 hover:bg-cyan-600 text-white py-2 px-4 rounded-lg"
-                            onClick={handleExportFlutter}>📱 Exportar Flutter</button>
 
                         {/* Modal para ingresar el nombre del proyecto */}
                         <ProjectNameModal
