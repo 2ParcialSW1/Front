@@ -98,7 +98,7 @@ export default function EditDiagram() {
                         >
                             {users.map((user) => (
                                 <option key={user._id} value={user._id}>
-                                    {`${user.firstName} ${user.lastName}`}
+                                    {`${user.firstName} `}
                                 </option>
                             ))}
                         </select>
@@ -116,7 +116,7 @@ export default function EditDiagram() {
                                         onDoubleClick={() => addParticipante(user._id)} // Doble clic para agregar participante
                                         className="py-2 px-3 border border-gray-300 rounded-md cursor-pointer hover:bg-gray-200"
                                     >
-                                        {`${user.firstName} ${user.lastName}`}
+                                        {`${user.firstName} `}
                                     </li>
                                 ))}
                         </ul>
@@ -135,7 +135,7 @@ export default function EditDiagram() {
                                         onDoubleClick={() => removeParticipante(participante._id)} // Doble clic para remover participante
                                         className="py-2 px-3 border border-gray-300 rounded-md cursor-pointer hover:bg-gray-200"
                                     >
-                                        {`${participante.firstName} ${participante.lastName}`}
+                                        {`${participante.firstName}`}
                                     </li>
                                 ))}
                         </ul>
